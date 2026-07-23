@@ -125,6 +125,10 @@ Teensy emulator. The alert path fires end to end through the driver, the publish
 IVI. Sensor data in this repository is simulated or emulated; wiring in a production sensor is a
 matter of filling in the one bus-read function for that part.
 
+## Acknowledgments
+
+Developed in collaboration with [EcoSafeSense](https://ecosafesense.com).
+
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
