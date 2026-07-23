@@ -1,0 +1,21 @@
+# QNX build outputs
+nto/
+*.so
+*.o
+o.le/
+so.le/
+
+# Deploy staging (created by scripts/demo.sh)
+scripts/stage/
+
+# Python
+__pycache__/
+*.pyc
+
+# Secrets / env
+.env
+*.env
+
+# Editor / OS
+*.swp
+.DS_Store
