@@ -19,3 +19,6 @@ __pycache__/
 # Editor / OS
 *.swp
 .DS_Store
+
+# Local-only working notes — this repo is PUBLIC, keep them out of it
+CLAUDE.md
