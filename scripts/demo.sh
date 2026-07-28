@@ -21,10 +21,22 @@
 #   ./demo.sh stop             # slay the sensor service + publisher on the Pi
 #   ./demo.sh teensy           # open the Teensy serial monitor (p=pollute g=co2 c=clear s=state)
 #
+# Signal-service (QPP / COVESA VSS) path. See ../vss/README.md. Set QPP_BIN first.
+#   ./demo.sh vss-stage        # stage qpp + the signal catalog + both connectors
+#   ./demo.sh vss-deploy       # curl them onto the target
+#   ./demo.sh mux              # mux the I2C header pins only (no sensor service)
+#   ./demo.sh qpp              # start the signal service with the air-quality catalog
+#   ./demo.sh vss-publish [bus] [addr]  # direct: I2C -> signal service (default 1 0x28)
+#   ./demo.sh vss-connect [unit]        # bridged: Sensor Framework unit -> signal service
+#   ./demo.sh vss-read [signal path]    # cat a signal back (default Cabin PM25)
+#   ./demo.sh vss-stop         # stop the connectors and the signal service
+#
 # Typical flows:
 #   Full SIM demo:  httpd; deploy; sim; publisher sim; ivi    (open browser; use IVI Demo button too)
 #   Force ALERT:    sim-pollute; publisher sim                (IVI banner fires)
 #   I2C demo:  (wire Teensy<->Pi) httpd; deploy; i2c; publisher i2c; ivi  # + ./demo.sh teensy to pollute
+#   Signal service (direct):  vss-stage; httpd; vss-deploy; mux; qpp; vss-publish; vss-read
+#   Signal service (bridged): vss-stage; httpd; vss-deploy; deploy; i2c; qpp; vss-connect; vss-read
 #
 set -u
 PI_IP="${QNX_IP:-192.168.1.10}"
@@ -37,6 +49,12 @@ STAGE="$HERE/stage"
 SF_ROOT="${SF_ROOT:-$HOME/qnx800/source/source_package_sf_sensor}"
 SO="$SF_ROOT/lib/sensor_drivers/external_sensors/aq/nto/aarch64/so.le/libaq_external_sensor.so"
 PUB="$SF_ROOT/apps/sensor/aq_publisher/nto/aarch64/o.le/aq_publisher"
+# Signal-service (QPP / COVESA VSS) path. QPP_BIN is the qpp binary you built for
+# your target from github.com/qnx/qnx-posix-publish-subscribe (not shipped in the SDP).
+QPP_BIN="${QPP_BIN:-}"
+VSS_DIR="$HERE/../vss"
+VSS_TARGET=/data/var/tmp/vssaq
+CATALOG=qpp_catalog_airquality_demo.json
 TARGET_DIR=/data/var/tmp/aq
 TEENSY=/dev/ttyACM0
 
@@ -72,6 +90,61 @@ case "${1:-}" in
          nohup /system/bin/sensor -U 1000 -r $TARGET_DIR/roll -c $TARGET_DIR/$CONF -vvvv \
            >$TARGET_DIR/sensor.log 2>&1 & sleep 1.5; echo started with $CONF; ls /dev/sensor" 6
     ;;
+  # ---- signal-service (QPP / COVESA VSS) path -------------------------------
+  mux)
+    # Mux the header I2C pins and nothing else. The QNX rpi image leaves GPIO2/3
+    # unmuxed, so /dev/i2c1 is dead until this runs. Split out from `i2c` so the
+    # direct publisher can use it without starting the sensor service.
+    qsh "gpio-bcm2711 set 2 a0 pu; gpio-bcm2711 set 3 a0 pu; echo 'I2C header pins muxed'" 4
+    ;;
+  vss-stage)
+    mkdir -p "$STAGE"
+    [ -n "$QPP_BIN" ] || { echo "ERROR: set QPP_BIN to the qpp binary you built for the target." >&2
+                           echo "Build it from github.com/qnx/qnx-posix-publish-subscribe with the SDP." >&2; exit 1; }
+    [ -f "$QPP_BIN" ] || { echo "ERROR: no qpp binary at $QPP_BIN" >&2; exit 1; }
+    cp "$QPP_BIN" "$STAGE/qpp"
+    cp "$VSS_DIR/catalog/$CATALOG" "$STAGE/"
+    for b in aq_signal_publisher aq_signal_connector; do
+      [ -f "$VSS_DIR/connector/$b" ] && cp "$VSS_DIR/connector/$b" "$STAGE/"
+    done
+    [ -f "$STAGE/aq_signal_publisher" ] || echo "NOTE: aq_signal_publisher not built (cd ../vss/connector && make publisher)"
+    echo "staged in $STAGE:"; ls -l "$STAGE" | grep -E 'qpp|aq_signal|catalog'
+    echo ">> now run './demo.sh httpd' in another shell, then './demo.sh vss-deploy'"
+    ;;
+  vss-deploy)
+    qsh "mkdir -p $VSS_TARGET; cd $VSS_TARGET; \
+         for f in qpp $CATALOG aq_signal_publisher aq_signal_connector; do \
+           /system/bin/curl -sf -o \$f http://$LAP_IP:$HTTP_PORT/\$f || rm -f \$f; done; \
+         chmod +x qpp aq_signal_publisher aq_signal_connector 2>/dev/null; ls -l $VSS_TARGET" 8
+    ;;
+  qpp)
+    qsh "slay -f qpp 2>/dev/null; sleep 0.5; \
+         on -d $VSS_TARGET/qpp -s -c $VSS_TARGET/$CATALOG -m /dev/qpp -l INF; \
+         sleep 2; echo -n 'signal files: '; find /dev/qpp -type f | wc -l" 8
+    ;;
+  vss-publish)
+    # Direct path: I2C -> signal service. No sensor service involved.
+    BUS="${2:-1}"; ADDR="${3:-0x28}"     # defaults match configs/aq_i2c.conf
+    qsh "slay -f aq_signal_publisher 2>/dev/null; sleep 0.3; \
+         on -d $VSS_TARGET/aq_signal_publisher -b $BUS -a $ADDR -m /dev/qpp -f 1 -v \
+           > $VSS_TARGET/pub.log 2>&1; sleep 4; cat $VSS_TARGET/pub.log" 10
+    ;;
+  vss-connect)
+    # Bridged path: Sensor Framework unit -> signal service. Start the sensor
+    # service first (./demo.sh i2c or sim), then qpp, then this.
+    qsh "slay -f aq_signal_connector 2>/dev/null; sleep 0.3; \
+         on -d $VSS_TARGET/aq_signal_connector -m /dev/qpp -u ${2:-1}; \
+         sleep 3; pidin ar | grep aq_signal_connector" 8
+    ;;
+  vss-read)
+    SIG="${2:-Vehicle/Cabin/AirQuality/PM25}"
+    qsh "echo -n '$SIG = '; cat '/dev/qpp/$SIG?text'" 5
+    ;;
+  vss-stop)
+    qsh "slay -f aq_signal_publisher 2>/dev/null; slay -f aq_signal_connector 2>/dev/null; \
+         slay -f qpp 2>/dev/null; sleep 0.5; ls /dev/qpp 2>&1; echo vss-stopped" 6
+    ;;
+
   publisher)
     BUS="${2:-sim}"
     qsh "slay -f aq_publisher 2>/dev/null; sleep 0.3; \

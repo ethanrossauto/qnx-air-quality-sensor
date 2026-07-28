@@ -22,3 +22,7 @@ __pycache__/
 
 # Local-only working notes — this repo is PUBLIC, keep them out of it
 CLAUDE.md
+
+# Compiled connectors (vss/connector/Makefile output)
+vss/connector/aq_signal_publisher
+vss/connector/aq_signal_connector
