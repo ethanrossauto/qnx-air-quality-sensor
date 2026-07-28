@@ -23,10 +23,12 @@ sensor over I2C, shown by `LIVE · I2C` in the top bar.*
 air-quality signals at all, and no concentration units** to express them in. Verified across
 master, v6.0 and v5.1.
 
-So [`vss/`](vss/) contains a proposal to add them, validated with COVESA's own toolchain but
-not yet filed upstream, and two working programs that publish a physical sensor into the QNX
-signal service under those names. One reads the I²C bus directly. The other bridges an
-existing Sensor Framework unit.
+So [`vss/`](vss/) contains a proposal to add them, validated with COVESA's own toolchain and
+filed upstream as
+[issue #930](https://github.com/COVESA/vehicle_signal_specification/issues/930) and
+[PR #931](https://github.com/COVESA/vehicle_signal_specification/pull/931). Alongside it are
+two working programs that publish a physical sensor into the QNX signal service under those
+names. One reads the I²C bus directly. The other bridges an existing Sensor Framework unit.
 
 That is the part of this repository most worth reading.
 

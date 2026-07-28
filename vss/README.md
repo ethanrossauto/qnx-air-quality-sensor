@@ -8,12 +8,16 @@ $ cat /dev/qpp/Vehicle/Cabin/AirQuality/PM25?text
 119.000000
 ```
 
-That path is not invented for this project. It is a signal from a **PR-ready COVESA
-proposal** kept in this repository, because the VSS standard catalog currently has no
-air-quality signals at all. To be exact about status: the proposal is written, validated
-against COVESA's own toolchain, and packaged as a patch that applies to VSS master. **It
-has not been filed upstream yet**, so nothing here is standard, and the signals work today
-only because the QNX signal service is happy to boot a custom catalog.
+That path is not invented for this project. It comes from a **COVESA proposal filed from this
+repository**, because the VSS standard catalog currently has no air-quality signals at all:
+
+- [Issue #930](https://github.com/COVESA/vehicle_signal_specification/issues/930), describing the gap
+- [PR #931](https://github.com/COVESA/vehicle_signal_specification/pull/931), the change itself
+
+To be exact about status: **proposed is not the same as accepted.** The proposal is filed and
+validated against COVESA's own toolchain, but it has not been reviewed, merged, or released,
+and it may well be rescoped or rejected. Nothing here is a standard signal yet. The signals
+work today only because the QNX signal service is happy to boot a custom catalog.
 
 ## The problem this solves
 
@@ -58,7 +62,7 @@ proposal is about making the signals *standard* rather than about making them *w
 
 | Path | What it is |
 |---|---|
-| `proposal/` | The COVESA proposal: 14 signals (7 measurements × Cabin and Exterior), the three missing units, and a `mass-per-volume` quantity. Available as a PR-ready patch against VSS master **and** as a standalone overlay that applies to an unmodified catalog. Design rationale in [`proposal/PROPOSAL.md`](proposal/PROPOSAL.md). |
+| `proposal/` | The COVESA proposal: 14 signals (7 measurements × Cabin and Exterior), the three missing units, and a `mass-per-volume` quantity. This is what was filed as [PR #931](https://github.com/COVESA/vehicle_signal_specification/pull/931), and it also works as a standalone overlay against an unmodified catalog. Design rationale in [`proposal/PROPOSAL.md`](proposal/PROPOSAL.md). |
 | `connector/aq_signal_publisher.c` | **The direct path.** Opens the I²C bus, reads the sensor, writes the signal files. No Sensor Framework anywhere in the process. |
 | `connector/aq_signal_connector.c` | **The bridged path.** Subscribes to an existing QNX Sensor Framework unit and republishes it as VSS signals. Use this if the sensor is already a framework unit. |
 | `connector/Makefile` | Builds both, relative paths only. |
