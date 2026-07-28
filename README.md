@@ -5,6 +5,12 @@ signal** in the QNX signal service, and as a first-class unit in the **QNX Senso
 Framework**. Both run on QNX 8.0 on a Raspberry Pi, and both drive a car-cabin
 "infotainment" screen that turns red when the cabin air is no longer clean.
 
+> **The signals used here are now filed with COVESA**, because the standard has no way to
+> describe air quality yet:
+> [issue #930](https://github.com/COVESA/vehicle_signal_specification/issues/930) ·
+> [PR #931](https://github.com/COVESA/vehicle_signal_specification/pull/931).
+> Filed, not merged. See [`vss/`](vss/).
+
 ```
 $ cat /dev/qpp/Vehicle/Cabin/AirQuality/PM25?text
 119.000000
