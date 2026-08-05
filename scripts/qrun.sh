@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# qrun.sh: run a target executable via the qconn launcher and print its stdout/stderr.
+# qrun.sh — run a target executable via the qconn launcher and print its stdout/stderr.
 # Usage: qrun.sh <abs-path-to-exe> [args...]
 # argv0 is set to the exe path automatically.
+# Machine-specific addresses live in scripts/env.local.sh (gitignored). The
+# defaults below are placeholders, not anyone's real network.
+[ -f "$(dirname "$0")/env.local.sh" ] && . "$(dirname "$0")/env.local.sh"
 IP="${QNX_IP:-192.168.1.10}"
 PORT="${QNX_PORT:-8000}"
 EXE="$1"; shift

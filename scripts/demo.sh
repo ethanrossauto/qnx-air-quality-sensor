@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# demo.sh: drive the QNX AQ Sensor-Framework demo on the CM4 over qconn/WiFi.
+# demo.sh — drive the QNX AQ Sensor-Framework demo on the CM4 over qconn/WiFi.
 #
-# Network (set QNX_IP / LAPTOP_IP to match yours; the IPs below are examples):
+# Network (set QNX_IP / LAPTOP_IP to match yours; the addresses below are examples):
 #   Pi (QNX):   192.168.1.10  qconn TCP 8000
 #   Laptop:     192.168.1.11  HTTP file server on :8099
 #
@@ -12,49 +12,33 @@
 #   ./demo.sh sim              # (re)start the sensor service with the SIM bus, detached
 #   ./demo.sh i2c              # (re)start the sensor service with the I2C bus (Teensy), detached
 #   ./demo.sh observe [N]      # run sensor_example on unit 1, print N buffers (default 8)
-#   ./demo.sh sim-pollute      # (re)start the service with SIM bus + sim_pollute=1 (forces filter ALERT)
-#   ./demo.sh sim-co2          # (re)start the service with SIM bus + sim_co2=1 (forces CO2 ALERT)
+#   ./demo.sh sim-pollute      # (re)start the service with SIM bus + sim_pollute=1 (forces ALERT)
 #   ./demo.sh publisher [bus]  # (re)start the SSE publisher on the Pi (:8090), bus label sim|i2c (default sim)
 #   ./demo.sh sse              # curl the Pi SSE stream to the terminal (sanity check)
 #   ./demo.sh ivi              # serve the browser IVI on http://localhost:8080  (open it in a browser)
+#   ./demo.sh gpiosweep        # print the header-GPIO meter plan (I2C-blocker diagnostic)
+#   ./demo.sh gpiodrive N [hi|lo] # drive header GPIO N high/low + hold, so you can meter the pin
 #   ./demo.sh slog             # dump the running service's slog2 (errors + rates)
 #   ./demo.sh stop             # slay the sensor service + publisher on the Pi
-#   ./demo.sh teensy           # open the Teensy serial monitor (p=pollute g=co2 c=clear s=state)
-#
-# Signal-service (QPP / COVESA VSS) path. See ../vss/README.md. Set QPP_BIN first.
-#   ./demo.sh vss-stage        # stage qpp + the signal catalog + both connectors
-#   ./demo.sh vss-deploy       # curl them onto the target
-#   ./demo.sh mux              # mux the I2C header pins only (no sensor service)
-#   ./demo.sh qpp              # start the signal service with the air-quality catalog
-#   ./demo.sh vss-publish [bus] [addr]  # direct: I2C -> signal service (default 1 0x28)
-#   ./demo.sh vss-connect [unit]        # bridged: Sensor Framework unit -> signal service
-#   ./demo.sh vss-read [signal path]    # cat a signal back (default Cabin PM25)
-#   ./demo.sh vss-stop         # stop the connectors and the signal service
+#   ./demo.sh teensy           # open the Teensy serial monitor (p=pollute c=clear s=state)
 #
 # Typical flows:
 #   Full SIM demo:  httpd; deploy; sim; publisher sim; ivi    (open browser; use IVI Demo button too)
 #   Force ALERT:    sim-pollute; publisher sim                (IVI banner fires)
 #   I2C demo:  (wire Teensy<->Pi) httpd; deploy; i2c; publisher i2c; ivi  # + ./demo.sh teensy to pollute
-#   Signal service (direct):  vss-stage; httpd; vss-deploy; mux; qpp; vss-publish; vss-read
-#   Signal service (bridged): vss-stage; httpd; vss-deploy; deploy; i2c; qpp; vss-connect; vss-read
 #
 set -u
+# Machine-specific addresses live in scripts/env.local.sh (gitignored). The
+# defaults below are placeholders, not anyone's real network.
+[ -f "$(dirname "$0")/env.local.sh" ] && . "$(dirname "$0")/env.local.sh"
 PI_IP="${QNX_IP:-192.168.1.10}"
 LAP_IP="${LAPTOP_IP:-192.168.1.11}"
 PORT=8000
 HTTP_PORT=8099
 HERE="$(cd "$(dirname "$0")" && pwd)"
 STAGE="$HERE/stage"
-# SF_ROOT: your unzipped Sensor Framework example package (override if the SDP is not at ~/qnx800)
-SF_ROOT="${SF_ROOT:-$HOME/qnx800/source/source_package_sf_sensor}"
-SO="$SF_ROOT/lib/sensor_drivers/external_sensors/aq/nto/aarch64/so.le/libaq_external_sensor.so"
-PUB="$SF_ROOT/apps/sensor/aq_publisher/nto/aarch64/o.le/aq_publisher"
-# Signal-service (QPP / COVESA VSS) path. QPP_BIN is the qpp binary you built for
-# your target from github.com/qnx/qnx-posix-publish-subscribe (not shipped in the SDP).
-QPP_BIN="${QPP_BIN:-}"
-VSS_DIR="$HERE/../vss"
-VSS_TARGET=/data/var/tmp/vssaq
-CATALOG=qpp_catalog_airquality_demo.json
+SO=~/qnx800/source/source_package_sf_sensor/lib/sensor_drivers/external_sensors/aq/nto/aarch64/so.le/libaq_external_sensor.so
+PUB=~/qnx800/source/source_package_sf_sensor/apps/sensor/aq_publisher/nto/aarch64/o.le/aq_publisher
 TARGET_DIR=/data/var/tmp/aq
 TEENSY=/dev/ttyACM0
 
@@ -62,22 +46,20 @@ qsh() { bash "$HERE/qsh.sh" "$1" "${2:-4}"; }
 
 case "${1:-}" in
   httpd)
-    [ -f "$SO" ]  || { echo "ERROR: driver not built at $SO" >&2; echo "Build it first (see SETUP.md), or set SF_ROOT to your SDP source package." >&2; exit 1; }
-    [ -f "$PUB" ] || { echo "ERROR: publisher not built at $PUB" >&2; echo "Build it first (see SETUP.md), or set SF_ROOT to your SDP source package." >&2; exit 1; }
     mkdir -p "$STAGE"
-    cp "$SO" "$STAGE/libaq_external_sensor.so"
-    cp "$PUB" "$STAGE/aq_publisher"
-    cp "$HERE/../configs/"*.conf "$STAGE/"
+    cp "$SO" "$STAGE/libaq_external_sensor.so" 2>/dev/null
+    cp "$PUB" "$STAGE/aq_publisher" 2>/dev/null
+    cp "$HERE/../configs/"*.conf "$STAGE/" 2>/dev/null
     echo "serving $STAGE on 0.0.0.0:$HTTP_PORT (Ctrl-C to stop)"
     cd "$STAGE" && exec python3 -m http.server "$HTTP_PORT" --bind 0.0.0.0
     ;;
   deploy)
     qsh "mkdir -p $TARGET_DIR/roll; cd $TARGET_DIR; \
-         for f in libaq_external_sensor.so aq_publisher aq.conf aq_i2c.conf aq_sim_pollute.conf aq_sim_co2.conf; do \
+         for f in libaq_external_sensor.so aq_publisher aq.conf aq_i2c.conf aq_sim_pollute.conf; do \
            /system/bin/curl -s -o \$f http://$LAP_IP:$HTTP_PORT/\$f; done; \
          chmod +x aq_publisher; ls -l $TARGET_DIR" 6
     ;;
-  sim|i2c|sim-pollute|sim-co2)
+  sim|i2c|sim-pollute)
     CONF="aq.conf"
     MUX=""
     [ "$1" = i2c ] && CONF="aq_i2c.conf" &&
@@ -85,11 +67,14 @@ case "${1:-}" in
       # (BSC1 @0xfe804000 = GPIO2/3, header pins 3/5) is dead until we do it.
       MUX="gpio-bcm2711 set 2 a0 pu; gpio-bcm2711 set 3 a0 pu;"
     [ "$1" = sim-pollute ] && CONF="aq_sim_pollute.conf"
-    [ "$1" = sim-co2 ] && CONF="aq_sim_co2.conf"
     qsh "$MUX slay -f sensor 2>/dev/null; sleep 0.3; \
          nohup /system/bin/sensor -U 1000 -r $TARGET_DIR/roll -c $TARGET_DIR/$CONF -vvvv \
            >$TARGET_DIR/sensor.log 2>&1 & sleep 1.5; echo started with $CONF; ls /dev/sensor" 6
     ;;
+  scan)
+    qsh "gpio-bcm2711 set 2 a0 pu; gpio-bcm2711 set 3 a0 pu; $TARGET_DIR/i2cscan" 5
+    ;;
+
   # ---- signal-service (QPP / COVESA VSS) path -------------------------------
   mux)
     # Mux the header I2C pins and nothing else. The QNX rpi image leaves GPIO2/3
@@ -99,7 +84,7 @@ case "${1:-}" in
     ;;
   vss-stage)
     mkdir -p "$STAGE"
-    [ -n "$QPP_BIN" ] || { echo "ERROR: set QPP_BIN to the qpp binary you built for the target." >&2
+    [ -n "$QPP_BIN" ] || { echo "ERROR: set QPP_BIN to your built aarch64le qpp binary." >&2
                            echo "Build it from github.com/qnx/qnx-posix-publish-subscribe with the SDP." >&2; exit 1; }
     [ -f "$QPP_BIN" ] || { echo "ERROR: no qpp binary at $QPP_BIN" >&2; exit 1; }
     cp "$QPP_BIN" "$STAGE/qpp"
@@ -144,7 +129,6 @@ case "${1:-}" in
     qsh "slay -f aq_signal_publisher 2>/dev/null; slay -f aq_signal_connector 2>/dev/null; \
          slay -f qpp 2>/dev/null; sleep 0.5; ls /dev/qpp 2>&1; echo vss-stopped" 6
     ;;
-
   publisher)
     BUS="${2:-sim}"
     qsh "slay -f aq_publisher 2>/dev/null; sleep 0.3; \
@@ -165,6 +149,47 @@ case "${1:-}" in
     } | timeout $((N*2+12)) nc "$PI_IP" "$PORT" 2>&1 | tr -d '\000' | sed 's/QCONN//' \
       | grep -viE 'screen|drm|wfd|usb_otg|dma_lib|io_spi|^OK'
     ;;
+  gpiodrive)
+    # gpiodrive N [hi|lo|up|dn|in] — set header GPIO N to a state, read back, then HOLD
+    # (gpio-bcm2711 writes the pad register and exits, so the state persists — meter now).
+    #   hi = OUTPUT drive high   lo = OUTPUT drive low
+    #   up = INPUT + pull-up     dn = INPUT + pull-down    in = INPUT, no pull
+    # 'up' is the decisive link test: CM4 GPIO2/3 have 1.8k pull-ups to VREF (3.3V) on the
+    # module, so `gpiodrive 2 up` should read ~3.3V at header pin 3 IF the CM4 pad reaches
+    # the header. 0V there = broken CM4<->header link (reseat the CM4). (2026-07-05 blocker.)
+    G="${2:?usage: demo.sh gpiodrive <gpio#> [hi|lo|up|dn|in]}"; LV="${3:-hi}"
+    case "$LV" in
+      hi) SET="op dh";; lo) SET="op dl";;
+      up) SET="ip pu";; dn) SET="ip pd";; in) SET="ip no";;
+      *) echo "bad mode '$LV' (hi|lo|up|dn|in)"; exit 1;;
+    esac
+    qsh "gpio-bcm2711 set $G $SET; echo -n 'get $G => '; gpio-bcm2711 get $G" 4
+    echo ">> meter header pin for GPIO$G vs a GND pin (6/9/14/20/25/30/34/39)."
+    echo "   hi -> expect 3.3V | up -> expect 3.3V if CM4 pad reaches header | lo/dn -> 0V"
+    ;;
+  gpiosweep)
+    # Print the meter plan: drive a spread of pure-GPIO header pins high, one at a time,
+    # and meter each. If NONE follow -> header not driven at all (buffer/OE or mapping).
+    # If SOME follow -> only part of the header is routed/buffered -> mapping/partial-buffer.
+    cat <<'PLAN'
+GPIO drive-test sweep — run each, meter its header pin (vs a GND pin), note V:
+  gpio  phys-pin  board-silk   cmd
+   2      3       SDA          ./demo.sh gpiodrive 2      (the I2C SDA — known 0V)
+   4      7       GPIO4/D4     ./demo.sh gpiodrive 4
+   17     11      D17          ./demo.sh gpiodrive 17
+   27     13      D27          ./demo.sh gpiodrive 27
+   22     15      D22          ./demo.sh gpiodrive 22
+   26     37      D26          ./demo.sh gpiodrive 26
+   16     36      D16          ./demo.sh gpiodrive 16
+   21     40      D21          ./demo.sh gpiodrive 21
+GND pins to meter against: 6, 9, 14, 20, 25, 30, 34, 39.
+Reset a pin when done: ./demo.sh gpiodrive <N> lo
+Read: ALL 0V -> header dead/buffered or offset mapping (leads #1/#3).
+      SOME 3.3V -> partial routing/buffer -> compare which follow vs the schematic.
+LED variant (lead #4, real drive proof): LED anode->header pin, cathode->330R->GND,
+      then ./demo.sh gpiodrive <N> hi  (LED lights only if the pad truly drives).
+PLAN
+    ;;
   slog)
     qsh "slog2info -b sensor_service 2>/dev/null | tail -30" 5
     ;;
@@ -173,7 +198,7 @@ case "${1:-}" in
     ;;
   teensy)
     stty -F "$TEENSY" 115200 raw -echo 2>/dev/null
-    echo "Teensy serial ($TEENSY): type p=pollute g=co2 c=clear s=state ?=help, Ctrl-C to exit"
+    echo "Teensy serial ($TEENSY) — type p=pollute c=clear s=state ?=help, Ctrl-C to exit"
     cat "$TEENSY" &
     CATPID=$!
     trap "kill $CATPID 2>/dev/null" EXIT
