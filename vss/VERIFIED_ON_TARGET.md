@@ -25,7 +25,8 @@ I²C pins at boot, so `/dev/i2c1` is dead until `gpio-bcm2711 set 2 a0 pu` and
 **The catalog loads.** QPP started in signal-service mode against the air-quality catalog
 and materialised all 17 signals under the mount point, plus their metadata siblings and the
 one `?control` channel for the `IsRecirculationActive` actuator. Reading
-`.PM25.metadata` returned the proposed VSS definition, including `"unit":"ug/m^3"` and the
+`.PM25.metadata` returned the VSS definition (proposed at the time of this test, merged into
+COVESA `master` on 2026-08-05), including `"unit":"ug/m^3"` and the
 description, served back by a QNX resource manager.
 
 **Both connector shapes ran, on separate occasions.**

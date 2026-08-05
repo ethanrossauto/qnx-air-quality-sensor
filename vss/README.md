@@ -9,14 +9,15 @@ $ cat /dev/qpp/Vehicle/Cabin/AirQuality/PM25?text
 ```
 
 That path is not invented for this project. It comes from a **COVESA proposal filed from this
-repository**, because the VSS standard catalog currently has no air-quality signals at all:
+repository and since merged into the standard**, which until then had no air-quality signals at all:
 
 - [Issue #930](https://github.com/COVESA/vehicle_signal_specification/issues/930), describing the gap
 - [PR #931](https://github.com/COVESA/vehicle_signal_specification/pull/931), the change itself
 
-To be exact about status: **proposed is not the same as accepted.** The proposal is filed and
-validated against COVESA's own toolchain, but it has not been reviewed, merged, or released,
-and it may well be rescoped or rejected. Nothing here is a standard signal yet. The signals
+To be exact about status: **merged is not the same as released.** The proposal was reviewed,
+approved and merged into COVESA `master` on 2026-08-05, validated against COVESA's own
+toolchain. It is not yet in a tagged release, so a consumer pinned to v6.0 or v5.1 will not
+see these signals. The signals
 work today only because the QNX signal service is happy to boot a custom catalog.
 
 ## The problem this solves
@@ -37,9 +38,10 @@ So there are two questions, and this folder answers both:
 2. **How do you get the sensor into the signal service?** Two working programs, in
    `connector/`.
 
-## Finding 1: COVESA VSS has no air-quality signals, and no concentration units
+## Finding 1: COVESA VSS had no air-quality signals, and no concentration units
 
-Checked across VSS `master`, `v6.0` and `v5.1`:
+This was the gap the proposal closed. Checked across VSS `master`, `v6.0` and `v5.1` **as they
+stood when this was written**. `master` has since merged the signals below:
 
 - **Zero air-quality signals.** No PM, CO2, VOC, NO2, ozone, or AQI anywhere in the cabin
   or ambient branches. The only CO2 in the catalog is `Vehicle.EmissionsCO2`, a tailpipe

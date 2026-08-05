@@ -5,11 +5,11 @@ signal** in the QNX signal service, and as a first-class unit in the **QNX Senso
 Framework**. Both run on QNX 8.0 on a Raspberry Pi, and both drive a car-cabin
 "infotainment" screen that turns red when the cabin air is no longer clean.
 
-> **The signals used here are now filed with COVESA**, because the standard has no way to
-> describe air quality yet:
+> **The signals used here are now part of COVESA VSS.** The standard had no way to describe
+> air quality, so this repository proposed one:
 > [issue #930](https://github.com/COVESA/vehicle_signal_specification/issues/930) ·
 > [PR #931](https://github.com/COVESA/vehicle_signal_specification/pull/931).
-> Filed, not merged. See [`vss/`](vss/).
+> **Merged into `master` on 2026-08-05.** Not yet in a tagged release. See [`vss/`](vss/).
 
 ```
 $ cat /dev/qpp/Vehicle/Cabin/AirQuality/PM25?text
@@ -25,9 +25,10 @@ sensor over I2C, shown by `LIVE · I2C` in the top bar.*
 
 ## Start here: [`vss/`](vss/)
 
-`Vehicle.Cabin.AirQuality.PM25` is not a signal that exists yet. **COVESA VSS has no
-air-quality signals at all, and no concentration units** to express them in. Verified across
-master, v6.0 and v5.1.
+`Vehicle.Cabin.AirQuality.PM25` is a new signal. Until 2026-08-05 **COVESA VSS had no
+air-quality signals at all, and no concentration units** to express them in, verified across
+master, v6.0 and v5.1. The signals below closed that gap and are now merged into `master`;
+the released tags v6.0 and v5.1 still predate them.
 
 So [`vss/`](vss/) contains a proposal to add them, validated with COVESA's own toolchain and
 filed upstream as
