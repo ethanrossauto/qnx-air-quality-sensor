@@ -388,15 +388,35 @@ t6_cstatic() {
   # suppressed by name rather than by lowering the whole severity floor, so a real defect still
   # lands. --inline-suppr lets a source file justify a finding at the line it happens on.
   #
-  # --check-level=exhaustive is deliberate. Without it cppcheck prints an information line on
-  # every file saying it limited its branch analysis, which would either fail the group forever
-  # or have to be suppressed. Suppressing it would mean the group silently checked less than it
-  # claims, so the honest fix is to do the deeper analysis. These files are small.
+  # --check-level=exhaustive is deliberate. Without it a modern cppcheck prints an information
+  # line on every file saying it limited its branch analysis, which would either fail the group
+  # forever or have to be suppressed. Suppressing it would mean the group silently checked less
+  # than it claims, so the honest fix is to do the deeper analysis. These files are small.
+  #
+  # ⚠️ BUT THE OPTION ONLY EXISTS FROM cppcheck 2.11, AND UBUNTU 22.04 SHIPS 2.7. On 2.7 it is an
+  # unknown option, cppcheck writes an error to stderr, this group captures stderr, and the error
+  # is reported as a finding. That reddened this project's very first CI run: 24.04 passed and
+  # 22.04 failed, which reads like a code problem and is not one.
+  #
+  # So PROBE the binary in front of us rather than assuming its age. On a cppcheck too old for the
+  # option, nothing is lost: the information line it exists to silence was introduced by the same
+  # release that introduced the option.
+  # ⚠️ AND the message is suppressed as well as the flag being probed, which is belt AND braces
+  # on purpose. The two are not the same lever: the flag makes the message unnecessary, the
+  # suppression makes it harmless. Relying on the flag alone assumes no cppcheck ever emits the
+  # message without supporting the option, and that assumption is exactly the kind this file
+  # keeps getting punished for. On a cppcheck older than 2.11 the analysis is the default depth
+  # rather than exhaustive, which is a real if small reduction in what that runner checks. Said
+  # out loud rather than hidden.
+  local -a level=()
+  if "$CPPCHECK" --check-level=exhaustive --version >/dev/null 2>&1; then
+    level=(--check-level=exhaustive)
+  fi
   local out
-  out="$("$CPPCHECK" --quiet --error-exitcode=1 --inline-suppr --check-level=exhaustive \
+  out="$("$CPPCHECK" --quiet --error-exitcode=1 --inline-suppr "${level[@]}" \
           --enable=warning,performance,portability \
           --suppress=missingInclude --suppress=missingIncludeSystem \
-          --suppress=unmatchedSuppression \
+          --suppress=unmatchedSuppression --suppress=normalCheckLevelMaxBranches \
           "${c_list[@]}" 2>&1)" || true
   assert_empty "cppcheck clean (warning, performance, portability)" "$out"
 }
