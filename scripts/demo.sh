@@ -30,6 +30,7 @@
 set -u
 # Machine-specific addresses live in scripts/env.local.sh (gitignored). The
 # defaults below are placeholders, not anyone's real network.
+# shellcheck source=/dev/null   # gitignored by design; absent in a clone
 [ -f "$(dirname "$0")/env.local.sh" ] && . "$(dirname "$0")/env.local.sh"
 PI_IP="${QNX_IP:-192.168.1.10}"
 LAP_IP="${LAPTOP_IP:-192.168.1.11}"
@@ -93,7 +94,9 @@ case "${1:-}" in
       [ -f "$VSS_DIR/connector/$b" ] && cp "$VSS_DIR/connector/$b" "$STAGE/"
     done
     [ -f "$STAGE/aq_signal_publisher" ] || echo "NOTE: aq_signal_publisher not built (cd ../vss/connector && make publisher)"
-    echo "staged in $STAGE:"; ls -l "$STAGE" | grep -E 'qpp|aq_signal|catalog'
+    echo "staged in $STAGE:"
+    # shellcheck disable=SC2010  # a display line; these filenames are ours and alphanumeric
+    ls -l "$STAGE" | grep -E 'qpp|aq_signal|catalog'
     echo ">> now run './demo.sh httpd' in another shell, then './demo.sh vss-deploy'"
     ;;
   vss-deploy)
@@ -201,6 +204,7 @@ PLAN
     echo "Teensy serial ($TEENSY) — type p=pollute c=clear s=state ?=help, Ctrl-C to exit"
     cat "$TEENSY" &
     CATPID=$!
+    # shellcheck disable=SC2064  # expanding CATPID NOW is the point: trap the pid we just started
     trap "kill $CATPID 2>/dev/null" EXIT
     while read -rn1 k; do printf '%s' "$k" > "$TEENSY"; done
     ;;

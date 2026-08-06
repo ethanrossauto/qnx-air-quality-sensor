@@ -15,6 +15,9 @@ __pycache__/
 # Secrets / env
 .env
 *.env
+# Your own QNX_IP / LAPTOP_IP, copied from scripts/env.example.sh. SETUP.md tells you to
+# create this, so it has to be ignored here or the first commit publishes your addresses.
+scripts/env.local.sh
 
 # Editor / OS
 *.swp

@@ -113,6 +113,22 @@ Set both when the defaults in the script do not match your network:
 QNX_IP=<pi-ip> LAPTOP_IP=<host-ip> ./scripts/demo.sh <subcommand>
 ```
 
+To avoid repeating that on every command, copy `scripts/env.example.sh` to
+`scripts/env.local.sh` and put your two addresses in it. Every script sources that file when it
+is present, and it is gitignored, so your addresses stay out of the repo.
+
+### The two helper scripts
+
+`demo.sh` is the one you will use most, but it is built on two smaller helpers, and they are
+useful on their own when something is not working:
+
+| Script | What it does |
+|---|---|
+| `scripts/qsh.sh "<cmd>"` | runs a shell command on the target through `qconn` and prints its output. This is how you look around the Pi's filesystem, since SSH is not available. |
+| `scripts/qrun.sh <abs-path> [args]` | launches a binary on the target by absolute path, setting `argv0` for you. |
+
+Both read `QNX_IP` and `QNX_PORT` the same way `demo.sh` does.
+
 Over WiFi this is just the two LAN addresses. For a **direct wired link** between the host
 and the Pi (no DHCP server), give both ends a static link-local (`169.254.0.0/16`) address in
 the same subnet:

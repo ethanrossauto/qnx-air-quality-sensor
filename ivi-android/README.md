@@ -18,7 +18,7 @@ SSE stream and showing the cabin-air-quality screen with the filter ALERT.
   runs without the Pi. Sources sit behind the `AirSource` interface.
 
 ## Run (in Android Studio)
-1. Open `~/Claude/qnx/ivi-android/` in Android Studio (Giraffe/Koala or newer).
+1. Open this `ivi-android/` directory in Android Studio (Giraffe/Koala or newer).
 2. The Gradle **wrapper jar is intentionally not committed**. Let Android Studio
    generate it on first sync, or run once from a machine with Gradle:
    `gradle wrapper --gradle-version 8.7`

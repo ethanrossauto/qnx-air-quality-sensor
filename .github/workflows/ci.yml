@@ -1,0 +1,66 @@
+# Everything real lives in tests/run.sh, and this file only installs what that script needs and
+# calls it. Two reasons. Anyone can reproduce a red build locally with one command instead of
+# reading yaml, and a test that can only run on a GitHub runner is a test nobody runs before
+# pushing.
+#
+# 🔒 NATIVE: this file lives in the MIRROR ONLY, and that is deliberate. The private qnx repo is
+# PRIVATE LOCAL, with a USB stick as its only remote and no GitHub remote at all, so a workflow
+# committed there would never run. Same arrangement as spotify to megaplay, and the opposite of
+# skryer, whose private repo is on GitHub and shares one workflow with its mirror.
+#
+# tests/run.sh IS shared (VERBATIM) and detects which side it is on, so the private repo still
+# runs the same suite by hand and at "save". Only the automation is one-sided.
+#
+# ⚠️ Nothing here needs a QNX target. The C and C++ cannot be COMPILED off-target at all, since
+# it includes hw/i2c.h and sensor/sensor_api.h from the QNX SDP, which is why the suite reaches
+# for cppcheck rather than a compiler.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # The weekly run catches breakage with no commit behind it: a linter or an analyser shipping a
+  # new check and turning a green tree red while nobody is looking.
+  # Note: GitHub disables scheduled workflows after 60 days with no repository activity.
+  schedule:
+    - cron: '23 7 * * 2'
+
+# Read-only, and no secrets are used anywhere in this file. A suite that needs a secret to pass
+# is a suite that cannot run on a fork's pull request.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      # Two Ubuntu versions, because "it works on my machine" is the failure this workflow exists
+      # to catch and the two images differ in more than they look like they do.
+      #
+      # ⚠️ shellcheck is the known one: 24.04 ships 0.9, 22.04 ships 0.8, and a suppression
+      # naming only the code YOUR shellcheck emits passes on one and fails on the other. See the
+      # SC2317/SC2329 note in tests/run.sh.
+      matrix:
+        os: [ubuntu-latest, ubuntu-22.04]
+    steps:
+      - uses: actions/checkout@v4
+
+      # Anything missing here makes a group SKIP rather than fail, so a forgotten package shows
+      # up as a gap in the summary rather than as a green run that checked nothing. Read the
+      # skip list at the end of the log.
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            shellcheck cppcheck python3-yaml
+
+      - name: Run the suite
+        run: bash tests/run.sh
